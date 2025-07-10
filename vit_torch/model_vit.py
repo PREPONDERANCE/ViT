@@ -246,20 +246,22 @@ class VisionTransformer(nn.Module):
                 torch.zeros(1, img_size // patch_size, img_size // patch_size, emb_dim)
             )
 
-        self.blocks = [
-            Block(
-                emb_dim=emb_dim,
-                num_heads=num_heads,
-                mlp_ratio=mlp_ratio,
-                qkv_bias=qkv_bias,
-                norm_layer=norm_layer,
-                act_layer=act_layer,
-                use_rel_pos=use_rel_pos,
-                window_size=window_size if i in global_attn_indexes else 0,
-                input_size=(img_size // patch_size, img_size // patch_size),
-            )
-            for i in range(depth)
-        ]
+        self.blocks = nn.ModuleList(
+            [
+                Block(
+                    emb_dim=emb_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    norm_layer=norm_layer,
+                    act_layer=act_layer,
+                    use_rel_pos=use_rel_pos,
+                    window_size=window_size if i in global_attn_indexes else 0,
+                    input_size=(img_size // patch_size, img_size // patch_size),
+                )
+                for i in range(depth)
+            ]
+        )
 
         self.neck = nn.Sequential(
             nn.Conv2d(emb_dim, out_chan, kernel_size=1, stride=1),

@@ -99,20 +99,22 @@ class MaskedAutoEncoderViT(VisionTransformer):
         global_attn_indexes: tuple[int, ...],
         input_size: int,
     ) -> list[Block]:
-        return [
-            Block(
-                emb_dim=emb_dim,
-                num_heads=num_heads,
-                mlp_ratio=mlp_ratio,
-                qkv_bias=qkv_bias,
-                norm_layer=norm_layer,
-                act_layer=act_layer,
-                use_rel_pos=use_rel_pos,
-                window_size=window_size if i in global_attn_indexes else 0,
-                input_size=(input_size, input_size),
-            )
-            for i in range(depth)
-        ]
+        return nn.ModuleList(
+            [
+                Block(
+                    emb_dim=emb_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    norm_layer=norm_layer,
+                    act_layer=act_layer,
+                    use_rel_pos=use_rel_pos,
+                    window_size=window_size if i in global_attn_indexes else 0,
+                    input_size=(input_size, input_size),
+                )
+                for i in range(depth)
+            ]
+        )
 
     def random_mask(
         self, x: torch.Tensor
@@ -126,18 +128,18 @@ class MaskedAutoEncoderViT(VisionTransformer):
         noise = torch.randn(B, L)
 
         idx_shuffle = torch.argsort(noise)
-        idx_restore = torch.argsort(idx_shuffle)
+        idx_restore = torch.argsort(idx_shuffle).to(x.device)
 
-        idx_keep = idx_shuffle[:, :len_keep]
-        x = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, C))
+        idx_keep = idx_shuffle[:, :len_keep].to(x.device)
+        x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, C))
         Hr = Wr = int(len_keep ** (0.5))
-        x = x.view(B, Hr, Wr, C)
+        x_masked = x_masked.view(B, Hr, Wr, C).to(x.device)
 
-        mask = torch.ones(B, L)
+        mask = torch.ones(B, L).to(x.device)
         mask[:, :len_keep] = 0
         mask = torch.gather(mask, dim=1, index=idx_restore)
 
-        return x, mask, idx_restore
+        return x_masked, mask, idx_restore
 
     def encode(
         self, x: torch.Tensor
